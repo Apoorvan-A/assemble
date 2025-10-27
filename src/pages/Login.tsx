@@ -41,15 +41,17 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setLoading(true);
     try {
       await login(formData.username, formData.password);
       navigate('/dashboard');
-    } catch (error) {
-      // Error handling is done in AuthContext
+    } catch (error: any) {
+      if (error.response?.data?.requires_verification) {
+        navigate('/verify-otp', { state: { email: formData.username } });
+      }
     } finally {
       setLoading(false);
     }

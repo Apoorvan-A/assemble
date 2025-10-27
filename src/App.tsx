@@ -7,6 +7,7 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyOTP from './pages/VerifyOTP';
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import CreateProject from './pages/CreateProject';
@@ -22,6 +23,10 @@ import Notifications from './pages/Notifications';
 import Applications from './pages/Applications';
 import Bookmarks from './pages/Bookmarks';
 import AdminPanel from './pages/AdminPanel';
+import ResearchPapers from './pages/ResearchPapers';
+import ResearchPaperDetail from './pages/ResearchPaperDetail';
+import UploadAbstract from './pages/UploadAbstract';
+import PublishPaper from './pages/PublishPaper';
 import LoadingSpinner from './components/LoadingSpinner';
 
 function AppContent() {
@@ -57,7 +62,7 @@ function AppContent() {
           </>
         } />
         <Route path="/register" element={
-          user ? <Navigate to="/dashboard" /> : 
+          user ? <Navigate to="/dashboard" /> :
           <>
             <Navbar />
             <main className="container mx-auto px-4 py-8">
@@ -65,7 +70,8 @@ function AppContent() {
             </main>
           </>
         } />
-        
+        <Route path="/verify-otp" element={<VerifyOTP />} />
+
         {/* Protected Routes */}
         <Route path="/dashboard" element={
           user ? 
@@ -204,6 +210,34 @@ function AppContent() {
         } />
         <Route path="/admin" element={
           user ? <AdminPanel /> : <Navigate to="/login" />
+        } />
+        <Route path="/research" element={
+          user ?
+          <>
+            <Navbar />
+            <ResearchPapers />
+          </> : <Navigate to="/login" />
+        } />
+        <Route path="/research/:id" element={
+          user ?
+          <>
+            <Navbar />
+            <ResearchPaperDetail />
+          </> : <Navigate to="/login" />
+        } />
+        <Route path="/research/upload-abstract" element={
+          user ?
+          <>
+            <Navbar />
+            <UploadAbstract />
+          </> : <Navigate to="/login" />
+        } />
+        <Route path="/research/:id/publish" element={
+          user ?
+          <>
+            <Navbar />
+            <PublishPaper />
+          </> : <Navigate to="/login" />
         } />
       </Routes>
       <Toaster 

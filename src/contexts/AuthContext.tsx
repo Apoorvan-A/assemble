@@ -29,6 +29,8 @@ interface AuthContextType {
   register: (username: string, email: string, password: string, fullName?: string) => Promise<void>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
+  setUser: (user: User | null) => void;
+  setToken: (token: string) => void;
   loading: boolean;
 }
 
@@ -100,6 +102,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         password,
         full_name: fullName
       });
+
+      if (response.data.requires_verification) {
+        toast.success('Registration successful! Please check your email for OTP.');
+        throw { requiresVerification: true, email: response.data.email };
+      }
+
       const { access_token, refresh_token, user: userData } = response.data;
 
       localStorage.setItem('token', access_token);
@@ -109,10 +117,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(userData);
       toast.success('Registration successful!');
     } catch (error: any) {
+      if (error.requiresVerification) {
+        throw error;
+      }
       const message = error.response?.data?.error || 'Registration failed';
       toast.error(message);
       throw error;
     }
+  };
+
+  const setToken = (token: string) => {
+    localStorage.setItem('token', token);
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   };
 
   const logout = () => {
@@ -133,6 +149,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     register,
     logout,
     updateUser,
+    setUser,
+    setToken,
     loading
   };
 

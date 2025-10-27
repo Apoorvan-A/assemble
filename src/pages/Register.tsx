@@ -63,15 +63,17 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setLoading(true);
     try {
       await register(formData.username, formData.email, formData.password, formData.fullName);
       navigate('/dashboard');
-    } catch (error) {
-      // Error handling is done in AuthContext
+    } catch (error: any) {
+      if (error.requiresVerification) {
+        navigate('/verify-otp', { state: { email: error.email } });
+      }
     } finally {
       setLoading(false);
     }

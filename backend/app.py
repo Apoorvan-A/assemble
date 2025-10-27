@@ -17,6 +17,7 @@ from notifications import notifications_bp
 from hackathons import hackathon_bp
 from chat import chat_bp
 from admin import admin_bp
+from research_papers import research_bp
 
 app = Flask(
     __name__,
@@ -101,6 +102,7 @@ try:
     app.register_blueprint(hackathon_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(research_bp)
     logger.info("All blueprints registered successfully")
 except Exception as e:
     logger.error(f"Failed to register blueprints: {str(e)}")

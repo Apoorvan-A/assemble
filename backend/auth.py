@@ -1,11 +1,12 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, create_refresh_token
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import pytz
 import re
 import logging
 from database import Session, User, Skill, Role, PortfolioItem, ActivityLog
+from email_service import send_otp_email, generate_otp
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 logger = logging.getLogger(__name__)
@@ -69,38 +70,35 @@ def register():
             logger.error(f"Email already exists: {email}")
             return jsonify({"error": "Email already exists"}), 409
         
-        # Create new user
         hashed_password = generate_password_hash(password)
+        otp = generate_otp()
+
         new_user = User(
             username=username,
             email=email,
             password=hashed_password,
             full_name=full_name or username,
+            email_otp=otp,
+            otp_created_at=datetime.now(IST),
+            is_email_verified=False,
             created_at=datetime.now(IST)
         )
-        
+
         session.add(new_user)
         session.commit()
-        
+
         logger.info(f"User created successfully: {username} (ID: {new_user.id})")
-        
-        # Create tokens
-        access_token = create_access_token(identity=new_user.username)
-        refresh_token = create_refresh_token(identity=new_user.username)
-        
-        logger.info(f"Tokens created for user: {username}")
-        
+
+        if send_otp_email(email, otp, username):
+            logger.info(f"OTP sent to {email}")
+        else:
+            logger.warning(f"Failed to send OTP to {email}")
+
         return jsonify({
-            "message": "User registered successfully",
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "user": {
-                "id": new_user.id,
-                "username": new_user.username,
-                "email": new_user.email,
-                "full_name": new_user.full_name,
-                "avatar_url": new_user.avatar_url
-            }
+            "message": "Registration successful. Please check your email for OTP verification.",
+            "user_id": new_user.id,
+            "email": new_user.email,
+            "requires_verification": True
         }), 201
         
     except Exception as e:
@@ -147,7 +145,11 @@ def login():
         if not check_password_hash(user.password, password):
             logger.error(f"Invalid password for user: {username}")
             return jsonify({"error": "Invalid credentials"}), 401
-        
+
+        if not user.is_email_verified:
+            logger.error(f"Unverified email login attempt: {username}")
+            return jsonify({"error": "Please verify your email before logging in", "requires_verification": True}), 403
+
         if not user.is_active:
             logger.error(f"Inactive account login attempt: {username}")
             return jsonify({"error": "Account is disabled"}), 401
@@ -554,7 +556,7 @@ def get_user_portfolio(user_id):
     session = Session()
     try:
         portfolio_items = session.query(PortfolioItem).filter_by(user_id=user_id).order_by(PortfolioItem.created_at.desc()).all()
-        
+
         items_data = []
         for item in portfolio_items:
             items_data.append({
@@ -567,11 +569,115 @@ def get_user_portfolio(user_id):
                 "technologies": item.technologies,
                 "created_at": item.created_at.isoformat()
             })
-        
+
         return jsonify(items_data), 200
-        
+
     except Exception as e:
         logger.error(f"Failed to fetch user portfolio: {type(e).__name__}: {str(e)}")
         return jsonify({"error": "Failed to fetch portfolio"}), 500
+    finally:
+        session.close()
+
+@auth_bp.route('/verify-otp', methods=['POST'])
+def verify_otp():
+    session = Session()
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        email = data.get('email', '').strip().lower()
+        otp = data.get('otp', '').strip()
+
+        if not email or not otp:
+            return jsonify({"error": "Email and OTP are required"}), 400
+
+        user = session.query(User).filter_by(email=email).first()
+
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        if user.is_email_verified:
+            return jsonify({"error": "Email already verified"}), 400
+
+        if not user.email_otp:
+            return jsonify({"error": "No OTP found. Please request a new one."}), 400
+
+        otp_age = datetime.now(IST) - user.otp_created_at
+        if otp_age > timedelta(minutes=10):
+            return jsonify({"error": "OTP has expired. Please request a new one."}), 400
+
+        if user.email_otp != otp:
+            return jsonify({"error": "Invalid OTP"}), 400
+
+        user.is_email_verified = True
+        user.email_otp = None
+        user.otp_created_at = None
+        session.commit()
+
+        access_token = create_access_token(identity=user.username)
+        refresh_token = create_refresh_token(identity=user.username)
+
+        logger.info(f"Email verified successfully for user: {user.username}")
+
+        return jsonify({
+            "message": "Email verified successfully",
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "full_name": user.full_name,
+                "avatar_url": user.avatar_url
+            }
+        }), 200
+
+    except Exception as e:
+        session.rollback()
+        logger.error(f"OTP verification failed: {type(e).__name__}: {str(e)}")
+        return jsonify({"error": "OTP verification failed", "details": str(e)}), 500
+    finally:
+        session.close()
+
+@auth_bp.route('/resend-otp', methods=['POST'])
+def resend_otp():
+    session = Session()
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        email = data.get('email', '').strip().lower()
+
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
+
+        user = session.query(User).filter_by(email=email).first()
+
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        if user.is_email_verified:
+            return jsonify({"error": "Email already verified"}), 400
+
+        otp = generate_otp()
+        user.email_otp = otp
+        user.otp_created_at = datetime.now(IST)
+        session.commit()
+
+        if send_otp_email(email, otp, user.username):
+            logger.info(f"OTP resent to {email}")
+            return jsonify({"message": "OTP sent successfully"}), 200
+        else:
+            logger.error(f"Failed to resend OTP to {email}")
+            return jsonify({"error": "Failed to send OTP"}), 500
+
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Resend OTP failed: {type(e).__name__}: {str(e)}")
+        return jsonify({"error": "Failed to resend OTP", "details": str(e)}), 500
     finally:
         session.close()

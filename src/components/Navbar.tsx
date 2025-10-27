@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { User, LogOut, Bell, MessageCircle, Menu, X, Search, Home, Briefcase, Users, Calendar, Bookmark, Shield } from 'lucide-react';
+import { User, LogOut, Bell, MessageCircle, Menu, X, Search, Home, Briefcase, Users, Calendar, Bookmark, Shield, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 
@@ -68,6 +68,7 @@ export default function Navbar() {
     { path: '/', label: 'Home', icon: Home },
     { path: '/projects', label: 'Projects', icon: Briefcase },
     { path: '/hackathons', label: 'Find Teams', icon: Calendar },
+    { path: '/research', label: 'Research', icon: FileText },
     { path: '/dashboard', label: 'Dashboard', icon: Users },
   ];
 

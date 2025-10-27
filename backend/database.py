@@ -79,7 +79,7 @@ hackathon_roles = Table(
 
 class User(Base):
     __tablename__ = 'users'
-    
+
     id = Column(Integer, primary_key=True)
     username = Column(String(80), unique=True, nullable=False)
     email = Column(String(120), unique=True, nullable=False)
@@ -89,18 +89,23 @@ class User(Base):
     location = Column(String(100), nullable=True)
     experience = Column(String(50), nullable=True)
     avatar_url = Column(String(255), nullable=True)
-    
+
+    # Email Verification
+    is_email_verified = Column(Boolean, default=False)
+    email_otp = Column(String(6), nullable=True)
+    otp_created_at = Column(DateTime, nullable=True)
+
     # Social Links
     github_url = Column(String(255), nullable=True)
     linkedin_url = Column(String(255), nullable=True)
     twitter_url = Column(String(255), nullable=True)
     portfolio_url = Column(String(255), nullable=True)
-    
+
     # Contact Preferences
     preferred_contact = Column(String(50), nullable=True)  # email, chat, linkedin
     availability = Column(String(50), nullable=True)  # available, busy, unavailable
     open_to_opportunities = Column(Boolean, default=True)
-    
+
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     last_login = Column(DateTime, nullable=True)
@@ -390,7 +395,7 @@ class ActivityLog(Base):
 
 class ProjectMilestone(Base):
     __tablename__ = 'project_milestones'
-    
+
     id = Column(Integer, primary_key=True)
     project_id = Column(Integer, ForeignKey('projects.id'), nullable=False)
     title = Column(String(200), nullable=False)
@@ -400,9 +405,30 @@ class ProjectMilestone(Base):
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(IST))
     updated_at = Column(DateTime, default=lambda: datetime.now(IST), onupdate=lambda: datetime.now(IST))
-    
+
     # Relationships
     project = relationship('Project', back_populates='milestones')
+
+class ResearchPaper(Base):
+    __tablename__ = 'research_papers'
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String(200), nullable=False)
+    abstract = Column(Text, nullable=False)
+    authors = Column(Text, nullable=False)
+    category = Column(String(100), nullable=True)
+    keywords = Column(Text, nullable=True)
+    status = Column(String(20), default='abstract')
+    paper_url = Column(String(255), nullable=True)
+    doi = Column(String(100), nullable=True)
+    publication_date = Column(DateTime, nullable=True)
+    owner_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(IST))
+    updated_at = Column(DateTime, default=lambda: datetime.now(IST), onupdate=lambda: datetime.now(IST))
+
+    # Relationships
+    owner = relationship('User')
 
 if __name__ == '__main__':
     try:
